@@ -1044,7 +1044,8 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingTightPng,
 #endif
 #ifdef LIBVNCSERVER_HAVE_SUNXI_H264
-    rfbEncodingH264,
+    rfbEncodingVAH264,
+    rfbEncodingOpenH264,
 #endif
 	rfbEncodingUltra,
 	rfbEncodingUltraZip,
@@ -2361,7 +2362,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    case rfbEncodingTightPng:
 #endif
 #ifdef LIBVNCSERVER_HAVE_SUNXI_H264
-        case rfbEncodingH264:
+        case rfbEncodingVAH264:
+        case rfbEncodingOpenH264:
 #endif
             /* The first supported encoding is the 'preferred' encoding */
                 if (cl->preferredEncoding == -1)

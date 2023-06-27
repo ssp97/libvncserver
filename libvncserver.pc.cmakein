@@ -8,6 +8,6 @@ Description: A library for easy implementation of a VNC server.
 Version: @LibVNCServer_VERSION@
 Requires:
 Requires.private:
-Libs: -L${libdir} -lvncserver
+Libs: -L${libdir} -lvncserver-sakura
 Libs.private: @PRIVATE_LIBS@
 Cflags: -I${includedir}

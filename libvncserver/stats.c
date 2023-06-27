@@ -102,6 +102,8 @@ char *encodingName(uint32_t type, char *buf, int len) {
     case rfbEncodingZlib:               snprintf(buf, len, "zlib");        break;
     case rfbEncodingTight:              snprintf(buf, len, "tight");       break;
     case rfbEncodingTightPng:           snprintf(buf, len, "tightPng");    break;
+    case rfbEncodingVAH264:             snprintf(buf, len, "VA H.264 (SakuraKVM Hardware)"); break;
+    case rfbEncodingOpenH264:           snprintf(buf, len, "Open H.264 (SakuraKVM Hardware)"); break;
     case rfbEncodingZlibHex:            snprintf(buf, len, "zlibhex");     break;
     case rfbEncodingUltra:              snprintf(buf, len, "ultra");       break;
     case rfbEncodingZRLE:               snprintf(buf, len, "ZRLE");        break;

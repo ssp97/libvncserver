@@ -66,6 +66,7 @@ option(WITH_TESTS "Build tests" ON)
 if(WITH_SUNXI_H264)
   # Maybe we should use find_package here, but I don't know how to do that now.
   # Fix that later.
+  message(STATUS "Sunxi CedarX H264 hardware encoder support is enabled")
   set(LIBVNCSERVER_HAVE_SUNXI_H264 1)
 endif()
 
