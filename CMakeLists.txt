@@ -44,6 +44,7 @@ option(WITH_ZLIB "Search for the zlib compression library to support additional 
 option(WITH_LZO "Search for the LZO compression library to omit internal miniLZO implementation" ON)
 option(WITH_JPEG "Search for the libjpeg compression library to support additional encodings" ON)
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
+option(WITH_SUNXI_H264 "Search for the sunxi cedar userland driver to support hardware h264 encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
 option(WITH_LIBSSH2 "Search for libssh2 to build an example ssh-tunneled client" ON)
@@ -62,7 +63,11 @@ option(WITH_SASL "Build with SASL support" ON)
 option(WITH_EXAMPLES "Build examples" ON)
 option(WITH_TESTS "Build tests" ON)
 
-
+if(WITH_SUNXI_H264)
+  # Maybe we should use find_package here, but I don't know how to do that now.
+  # Fix that later.
+  set(LIBVNCSERVER_HAVE_SUNXI_H264 1)
+endif()
 
 if(WITH_ZLIB)
   find_package(ZLIB)
