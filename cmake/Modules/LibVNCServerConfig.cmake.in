@@ -2,7 +2,7 @@
 
 include("${CMAKE_CURRENT_LIST_DIR}/LibVNCServerTargets.cmake")
 check_required_components(
-  vncclient
-  vncserver
+  vncclient-sakura
+  vncserver-sakura
   )
 
