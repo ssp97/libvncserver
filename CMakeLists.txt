@@ -558,6 +558,7 @@ set(LIBVNCSERVER_EXAMPLES
     simple15
     storepasswd
     vncev
+    h264test
   )
 
 if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))

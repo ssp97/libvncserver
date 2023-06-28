@@ -192,6 +192,12 @@ typedef struct _rfbExtensionData {
 	struct _rfbExtensionData* next;
 } rfbExtensionData;
 
+/*
+ * For sunxi H264 usage
+ */
+// H264 encoder callback function
+typedef rfbBool (*rfbH264EncoderCallback)(struct _rfbClientRec*, char *, size_t);
+
 /**
  * Per-screen (framebuffer) structure.  There can be as many as you wish,
  * each serving different clients. However, you have to call
@@ -291,6 +297,14 @@ typedef struct _rfbScreenInfo
      * The buffer will not be freed by
      */
     char* frameBuffer;
+    
+    /**
+     * the H264 buffer is only for Sunxi H264 hardware encoding. 
+     */
+    char* h264Buffer;
+    size_t h264BufferSize;
+    rfbH264EncoderCallback h264EncoderCallback;
+
     rfbKbdAddEventProcPtr kbdAddEvent;
     rfbKbdReleaseAllKeysProcPtr kbdReleaseAllKeys;
     rfbPtrAddEventProcPtr ptrAddEvent;
@@ -1121,7 +1135,6 @@ extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *bu
  */
 rfbBool rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen);
 rfbBool rfbUpdateClient(rfbClientPtr cl);
-
 
 #if(defined __cplusplus)
 }
