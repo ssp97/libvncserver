@@ -3100,7 +3100,309 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     }
 }
 
+#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
+/*
+ * sendOrQueueData - send data to the client if the send buffer is full,
+ * otherwise queue it.
+ * Returns TRUE on success, FALSE on failure.
+ * 
+ * This is for H264 use to build the framebuffer update message packet.
+ */
 
+rfbBool sendOrQueueData(rfbClientPtr cl, unsigned char * data, int size, int forceFlush) {
+    rfbBool result = TRUE;
+    if (size > UPDATE_BUF_SIZE) {
+        rfbErr("x264: send request size (%d) exhausts UPDATE_BUF_SIZE (%d) -> increase send buffer\n", size, UPDATE_BUF_SIZE);
+        result = FALSE;
+        goto error;
+    }
+
+    if(cl->ublen + size > UPDATE_BUF_SIZE) {
+        if(!rfbSendUpdateBuf(cl)) {
+            rfbErr("x264: could not send.\n");
+            result = FALSE;
+        }
+    }
+
+    memcpy(&cl->updateBuf[cl->ublen], data, size);
+    cl->ublen += size;
+
+    if(forceFlush) {
+        rfbLog("flush x264 data %d (payloadSize=%d)\n",cl->ublen,cl->ublen - sz_rfbFramebufferUpdateMsg - sz_rfbFramebufferUpdateRectHeader);
+        if(!rfbSendUpdateBuf(cl)) {
+            rfbErr("x264: could not send.\n");
+            result = FALSE;
+        }
+    }
+
+    error:
+    return result;
+}
+
+/*
+ * sendFramebufferUpdateMsg264 - send a framebuffer h264 update message to the
+ * RFB client.
+ */
+
+rfbBool sendFramebufferUpdateMsg264(rfbClientPtr cl, int x, int y, int w, int h, unsigned char * data, size_t size, int forceFlush) {
+    rfbBool result = TRUE;
+    rfbFramebufferUpdateMsg msg;
+    rfbFramebufferUpdateRectHeader header;
+
+    msg.type = rfbFramebufferUpdate;
+    msg.pad = 0;
+    msg.nRects = Swap16IfLE(1);
+
+    if(!sendOrQueueData(cl, (unsigned char*)&msg, sz_rfbFramebufferUpdateMsg, 0)) {
+        result = FALSE;
+        goto error;
+    }
+
+    header.r.x = Swap16IfLE(x);
+    header.r.y = Swap16IfLE(y);
+    header.r.w = Swap16IfLE(w);
+    header.r.h = Swap16IfLE(h);
+    header.encoding = Swap32IfLE(rfbEncodingOpenH264);
+
+    rfbStatRecordEncodingSent(cl, rfbEncodingOpenH264,
+                              sz_rfbFramebufferUpdateRectHeader + size,
+                              sz_rfbFramebufferUpdateRectHeader
+                              + w * (cl->format.bitsPerPixel / 8) * h);
+
+    if(!sendOrQueueData(cl, (unsigned char *)&header, sz_rfbFramebufferUpdateRectHeader, 0)) {
+        result = FALSE;
+        goto error;
+    }
+
+    if(!sendOrQueueData(cl, data, size, forceFlush)) {
+        result = FALSE;
+        goto error;
+    }
+
+    error:
+    return result;
+}
+
+typedef struct FramebufferAuxiliaryMessages {
+    rfbBool sendCursorShape;
+    rfbBool sendCursorPos;
+    rfbBool sendKeyboardLedState;
+    rfbBool sendSupportedMessages;
+    rfbBool sendSupportedEncodings;
+    rfbBool sendServerIdentity;
+} FramebufferAuxiliaryMessages;
+
+rfbBool
+getFramebufferUpdateAuxiliary(rfbClientPtr cl, FramebufferAuxiliaryMessages *messages) {
+    messages->sendSupportedMessages = FALSE;
+    messages->sendSupportedEncodings = FALSE;
+    messages->sendServerIdentity = FALSE;
+    messages->sendKeyboardLedState = FALSE;
+    messages->sendCursorShape = FALSE;
+    messages->sendCursorPos = FALSE;
+
+    /*
+     * If this client understands cursor shape updates, cursor should be
+     * removed from the framebuffer. Otherwise, make sure it's put up.
+     */
+
+    if (cl->enableCursorShapeUpdates) {
+        if (cl->cursorWasChanged && cl->readyForSetColourMapEntries)
+            messages->sendCursorShape = TRUE;
+    }
+
+    /*
+     * Do we plan to send cursor position update?
+     */
+
+    if (cl->enableCursorPosUpdates && cl->cursorWasMoved)
+        messages->sendCursorPos = TRUE;
+
+    /*
+     * Do we plan to send a keyboard state update?
+     */
+    if ((cl->enableKeyboardLedState) &&
+        (cl->screen->getKeyboardLedStateHook!=NULL))
+    {
+        int x;
+        x=cl->screen->getKeyboardLedStateHook(cl->screen);
+        if (x!=cl->lastKeyboardLedState)
+        {
+            messages->sendKeyboardLedState = TRUE;
+            cl->lastKeyboardLedState=x;
+        }
+    }
+
+    /*
+     * Do we plan to send a rfbEncodingSupportedMessages?
+     */
+    if (cl->enableSupportedMessages)
+    {
+        messages->sendSupportedMessages = TRUE;
+        /* We only send this message ONCE <per setEncodings message received>
+         * (We disable it here)
+         */
+        cl->enableSupportedMessages = FALSE;
+    }
+    /*
+     * Do we plan to send a rfbEncodingSupportedEncodings?
+     */
+    if (cl->enableSupportedEncodings)
+    {
+        messages->sendSupportedEncodings = TRUE;
+        /* We only send this message ONCE <per setEncodings message received>
+         * (We disable it here)
+         */
+        cl->enableSupportedEncodings = FALSE;
+    }
+    /*
+     * Do we plan to send a rfbEncodingServerIdentity?
+     */
+    if (cl->enableServerIdentity)
+    {
+        messages->sendServerIdentity = TRUE;
+        /* We only send this message ONCE <per setEncodings message received>
+         * (We disable it here)
+         */
+        cl->enableServerIdentity = FALSE;
+    }
+
+    return TRUE;
+}
+
+rfbBool
+sendFramebufferUpdateAuxiliary(rfbClientPtr cl, FramebufferAuxiliaryMessages *messages) {
+    LOCK(cl->updateMutex);
+    rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
+    fu->type = rfbFramebufferUpdate;
+    cl->ublen = sz_rfbFramebufferUpdateMsg;
+    fu->nRects = Swap16IfLE((uint16_t)(
+                        !!messages->sendCursorShape + !!messages->sendCursorPos + !!messages->sendKeyboardLedState +
+                        !!messages->sendSupportedMessages + !!messages->sendSupportedEncodings + !!messages->sendServerIdentity));
+
+    if (messages->sendCursorShape) {
+        cl->cursorWasChanged = FALSE;
+        if (!rfbSendCursorShape(cl))
+            goto updateFailed;
+    }
+
+    if (messages->sendCursorPos) {
+        cl->cursorWasMoved = FALSE;
+        if (!rfbSendCursorPos(cl))
+            goto updateFailed;
+    }
+
+    if (messages->sendKeyboardLedState) {
+        if (!rfbSendKeyboardLedState(cl))
+            goto updateFailed;
+    }
+
+    if (messages->sendSupportedMessages) {
+        if (!rfbSendSupportedMessages(cl))
+            goto updateFailed;
+    }
+    if (messages->sendSupportedEncodings) {
+        if (!rfbSendSupportedEncodings(cl))
+            goto updateFailed;
+    }
+    if (messages->sendServerIdentity) {
+        if (!rfbSendServerIdentity(cl))
+            goto updateFailed;
+    }
+    UNLOCK(cl->updateMutex);
+
+    return TRUE;
+updateFailed:
+
+    UNLOCK(cl->updateMutex);
+    return FALSE;
+}
+
+/*
+ * rfbSendFramebufferUpdateSunxiH264
+ * Pack and send the currently framebuffer to the RFB client.
+ */
+rfbBool rfbSendFramebufferUpdateSunxiH264(rfbClientPtr cl) {
+    int screenwidth = cl->screen->width;
+    int screenheight = cl->screen->height;
+    char *h264buffer;
+    size_t h264buffersize;
+    rfbBool result = FALSE;
+
+    char *h264packedbuffer = NULL;
+    size_t h264packedbuffersize = 0;
+
+    // TODO: demo mode, just send the already encoded data.
+    // TODO: change to sunxi h264 encoding.
+
+    if(cl->screen->h264EncoderCallback)
+    {
+        result = cl->screen->h264EncoderCallback(cl, cl->screen->h264Buffer, cl->screen->h264BufferSize);
+        if(!result)
+            return FALSE;
+    }
+    
+    h264buffer = cl->screen->h264Buffer;
+    h264buffersize = cl->screen->h264BufferSize;
+
+    h264packedbuffersize = h264buffersize + 8;
+    h264packedbuffer = malloc(h264packedbuffersize);
+    if (h264packedbuffer == NULL) {
+        rfbErr("x264: could not allocate memory for packed buffer.\n");
+        return FALSE;
+    }
+
+    // first uint32_t is the size of the h264 data.
+    // second uint32_t is the flag of the h264 data.
+
+    ((uint32_t *)h264packedbuffer)[0] = Swap32IfLE(h264buffersize);
+    // TODO: if have flag
+    ((uint32_t *)h264packedbuffer)[1] = Swap32IfLE(0);
+
+    memcpy(h264packedbuffer + 8, h264buffer, h264buffersize);
+
+    result = sendFramebufferUpdateMsg264(cl, 0, 0, screenwidth, screenheight, h264packedbuffer, h264packedbuffersize, 1);
+
+    free(h264packedbuffer);
+    return result;
+}
+
+/*
+ * sendFramebufferUpdateH264 - send the currently framebuffer to the RFB client.
+ * Using H264 encoding, so we just want to send the whole framebuffer.
+ * Auxiliary messages function are just copied from original function.
+ */
+rfbBool sendFramebufferUpdateH264(rfbClientPtr cl, sraRegionPtr givenUpdateRegion) {
+    FramebufferAuxiliaryMessages messages;
+    rfbBool result = TRUE;
+
+    if(cl->screen->displayHook)
+        cl->screen->displayHook(cl);
+
+    //TODO: resize support.
+
+    if(!getFramebufferUpdateAuxiliary(cl, &messages)) {
+        result = FALSE;
+        goto updateFailed;
+    }
+
+    if(!rfbSendFramebufferUpdateSunxiH264(cl)) {
+        result = FALSE;
+        goto updateFailed;
+    }
+
+    if(!sendFramebufferUpdateAuxiliary(cl, &messages)) {
+        result = FALSE;
+        goto updateFailed;
+    }
+
+updateFailed:
+    if(cl->screen->displayFinishedHook)
+        cl->screen->displayFinishedHook(cl, result);
+    
+    return result;
+}
+#endif
 
 /*
  * rfbSendFramebufferUpdate - send the currently pending framebuffer update to
@@ -3125,6 +3427,18 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendSupportedEncodings = FALSE;
     rfbBool sendServerIdentity = FALSE;
     rfbBool result = TRUE;
+
+#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
+    // For H264 encoding, there are no way to send partial update.
+    // So we send the whole framebuffer, then this function mostly code will become useless.
+    // We just hook this function to a new one.
+    if(cl->preferredEncoding == rfbEncodingOpenH264 || cl->preferredEncoding == rfbEncodingVAH264) {
+        if(!sendFramebufferUpdateH264(cl, givenUpdateRegion)) {
+            return FALSE;
+        }
+        return TRUE;
+    }
+#endif
     
 
     if(cl->screen->displayHook)
