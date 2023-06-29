@@ -1036,7 +1036,7 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 {
     rfbFramebufferUpdateRectHeader rect;
     static uint32_t supported[] = {
-        rfbEncodingRaw,
+    rfbEncodingRaw,
 	rfbEncodingCopyRect,
 	rfbEncodingRRE,
 	rfbEncodingCoRRE,
@@ -1052,6 +1052,9 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
 	rfbEncodingTightPng,
 #endif
+    rfbEncodingH264,
+    rfbEncodingOpenH264,
+    rfbEncodingVAH264,
 	rfbEncodingUltra,
 	rfbEncodingUltraZip,
 	rfbEncodingXCursor,
@@ -1064,6 +1067,7 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingSupportedMessages,
 	rfbEncodingSupportedEncodings,
 	rfbEncodingServerIdentity,
+
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbEncodingExtendedClipboard,
 #endif
@@ -2366,6 +2370,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
 	    case rfbEncodingTightPng:
 #endif
+            case rfbEncodingH264:
+            case rfbEncodingOpenH264:
+            case rfbEncodingVAH264:
             /* The first supported encoding is the 'preferred' encoding */
                 if (cl->preferredEncoding == -1)
                     cl->preferredEncoding = enc;
@@ -3102,7 +3109,6 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 }
 
 
-
 /*
  * rfbSendFramebufferUpdate - send the currently pending framebuffer update to
  * the RFB client.
@@ -3432,12 +3438,29 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	}
 	sraRgnReleaseIterator(i); i=NULL;
 #endif
+    } else if (cl->preferredEncoding == rfbEncodingH264){
+        nUpdateRegionRects = sraRgnCountRects(updateRegion);
+    } else if (cl->preferredEncoding == rfbEncodingVAH264) {
+        nUpdateRegionRects = sraRgnCountRects(updateRegion);
+    } else if (cl->preferredEncoding == rfbEncodingOpenH264){
+        nUpdateRegionRects = sraRgnCountRects(updateRegion);
     } else {
         nUpdateRegionRects = sraRgnCountRects(updateRegion);
     }
 
     fu->type = rfbFramebufferUpdate;
-    if (nUpdateRegionRects != 0xFFFF) {
+    if(cl->preferredEncoding == rfbEncodingH264 
+        && cl->preferredEncoding == rfbEncodingVAH264 
+        && cl->preferredEncoding == rfbEncodingOpenH264
+        )
+    {
+        fu->nRects = Swap16IfLE((uint16_t)(//sraRgnCountRects(updateCopyRegion) +
+                    //nUpdateRegionRects +
+                    !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState +
+                    !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity));
+                    
+    }
+    else if (nUpdateRegionRects != 0xFFFF) {
 	if(cl->screen->maxRectsPerUpdate>0
 	   /* CoRRE splits the screen into smaller squares */
 	   && cl->preferredEncoding != rfbEncodingCoRRE
@@ -3560,14 +3583,31 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	    break;
 #endif
 #endif
+    case rfbEncodingH264:
+	    if (!rfbSendRectEncodingH264(cl, x, y, w, h))
+	        goto updateFailed;
+        break;
+
+    case rfbEncodingVAH264:
+	    if (!rfbSendRectEncodingH264(cl, x, y, w, h))
+	        goto updateFailed;
+    case rfbEncodingOpenH264:
+	    if (!rfbSendRectEncodingH264(cl, x, y, w, h))
+	        goto updateFailed;
+        break;
         }
+    
     }
     if (i) {
         sraRgnReleaseIterator(i);
         i = NULL;
     }
 
-    if ( nUpdateRegionRects == 0xFFFF &&
+    if(cl->preferredEncoding == rfbEncodingH264 || cl->preferredEncoding == rfbEncodingVAH264 || cl->preferredEncoding == rfbEncodingOpenH264 )
+    {
+        
+    }
+    else if ( nUpdateRegionRects == 0xFFFF &&
 	 !rfbSendLastRectMarker(cl) )
 	    goto updateFailed;
 
@@ -3589,6 +3629,7 @@ updateFailed:
       cl->screen->displayFinishedHook(cl, result);
     return result;
 }
+
 
 
 /*

@@ -22,6 +22,9 @@ static encoding_t testEncodings[]={
 	{ rfbEncodingCoRRE, "corre" },
 	{ rfbEncodingHextile, "hextile" },
 	{ rfbEncodingUltra, "ultra" },
+	{ rfbEncodingVAH264, "VA H.264"},
+	{ rfbEncodingH264, "H.264"},
+	{ rfbEncodingOpenH264, "Open H.264"},
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	{ rfbEncodingZlib, "zlib" },
 	{ rfbEncodingZlibHex, "zlibhex" },

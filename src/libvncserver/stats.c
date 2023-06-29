@@ -116,6 +116,9 @@ char *encodingName(uint32_t type, char *buf, int len) {
     case rfbEncodingCacheZip:           snprintf(buf, len, "cacheZip");    break;
     case rfbEncodingSolMonoZip:         snprintf(buf, len, "monoZip");     break;
     case rfbEncodingUltraZip:           snprintf(buf, len, "ultraZip");    break;
+    case rfbEncodingH264:               snprintf(buf, len, "H.264");       break;
+    case rfbEncodingOpenH264:           snprintf(buf, len, "OPEN H.264");  break;
+    case rfbEncodingVAH264:             snprintf(buf, len, "VA H.264");    break;
 
     case rfbEncodingXCursor:            snprintf(buf, len, "Xcursor");     break;
     case rfbEncodingRichCursor:         snprintf(buf, len, "RichCursor");  break;

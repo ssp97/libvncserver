@@ -567,7 +567,7 @@ typedef struct _rfbClientRec {
      * means 8K minimum.
      */
 
-#define UPDATE_BUF_SIZE 32768
+#define UPDATE_BUF_SIZE 1024*1024//32768
 
     char updateBuf[UPDATE_BUF_SIZE];
     int ublen;
@@ -918,7 +918,8 @@ extern rfbBool rfbSendRectEncodingTightPng(rfbClientPtr cl, int x,int y,int w,in
 #endif
 #endif
 
-
+extern rfbBool rfbSendRectEncodingH264(rfbClientPtr cl, int x,int y,int w,int h);
+extern rfbBool rfbSendRectEncodingVAH264(rfbClientPtr cl, int x,int y,int w,int h);
 /* cursor.c */
 
 typedef struct rfbCursor {
