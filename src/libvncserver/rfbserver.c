@@ -3528,79 +3528,89 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	        goto updateFailed;
     }
 
-    for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
-        int x = rect.x1;
-        int y = rect.y1;
-        int w = rect.x2 - x;
-        int h = rect.y2 - y;
+    if(cl->preferredEncoding == rfbEncodingH264 || cl->preferredEncoding == rfbEncodingVAH264 || cl->preferredEncoding == rfbEncodingOpenH264 )
+    {
+        int x = 0;
+        int y = 0;
+        int w = cl->screen->width;
+        int h = cl->screen->height;
 
-        /* We need to count the number of rects in the scaled screen */
-        if (cl->screen!=cl->scaledScreen)
-            rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
 
-        switch (cl->preferredEncoding) {
-	case -1:
-        case rfbEncodingRaw:
-            if (!rfbSendRectEncodingRaw(cl, x, y, w, h))
-	        goto updateFailed;
-            break;
-        case rfbEncodingRRE:
-            if (!rfbSendRectEncodingRRE(cl, x, y, w, h))
-	        goto updateFailed;
-            break;
-        case rfbEncodingCoRRE:
-            if (!rfbSendRectEncodingCoRRE(cl, x, y, w, h))
-	        goto updateFailed;
-	    break;
-        case rfbEncodingHextile:
-            if (!rfbSendRectEncodingHextile(cl, x, y, w, h))
-	        goto updateFailed;
-            break;
-        case rfbEncodingUltra:
-            if (!rfbSendRectEncodingUltra(cl, x, y, w, h))
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);)
+        {
+            if (!rfbSendRectEncodingH264(cl, x, y, w, h))
+                goto updateFailed;
+        }
+            
+        if (i) {
+            sraRgnReleaseIterator(i);
+            i = NULL;
+        }
+    }
+    else
+    {
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
+
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
+
+            switch (cl->preferredEncoding) {
+        case -1:
+            case rfbEncodingRaw:
+                if (!rfbSendRectEncodingRaw(cl, x, y, w, h))
+                goto updateFailed;
+                break;
+            case rfbEncodingRRE:
+                if (!rfbSendRectEncodingRRE(cl, x, y, w, h))
+                goto updateFailed;
+                break;
+            case rfbEncodingCoRRE:
+                if (!rfbSendRectEncodingCoRRE(cl, x, y, w, h))
                 goto updateFailed;
             break;
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-	case rfbEncodingZlib:
-	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h))
-	        goto updateFailed;
-	    break;
-       case rfbEncodingZRLE:
-       case rfbEncodingZYWRLE:
-           if (!rfbSendRectEncodingZRLE(cl, x, y, w, h))
-	       goto updateFailed;
-           break;
-#endif
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG) && (defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG))
-	case rfbEncodingTight:
-	    if (!rfbSendRectEncodingTight(cl, x, y, w, h))
-	        goto updateFailed;
-	    break;
-#ifdef LIBVNCSERVER_HAVE_LIBPNG
-	case rfbEncodingTightPng:
-	    if (!rfbSendRectEncodingTightPng(cl, x, y, w, h))
-	        goto updateFailed;
-	    break;
-#endif
-#endif
-    case rfbEncodingH264:
-	    if (!rfbSendRectEncodingH264(cl, x, y, w, h))
-	        goto updateFailed;
-        break;
-
-    case rfbEncodingVAH264:
-	    if (!rfbSendRectEncodingH264(cl, x, y, w, h))
-	        goto updateFailed;
-    case rfbEncodingOpenH264:
-	    if (!rfbSendRectEncodingH264(cl, x, y, w, h))
-	        goto updateFailed;
-        break;
+            case rfbEncodingHextile:
+                if (!rfbSendRectEncodingHextile(cl, x, y, w, h))
+                goto updateFailed;
+                break;
+            case rfbEncodingUltra:
+                if (!rfbSendRectEncodingUltra(cl, x, y, w, h))
+                    goto updateFailed;
+                break;
+    #ifdef LIBVNCSERVER_HAVE_LIBZ
+        case rfbEncodingZlib:
+            if (!rfbSendRectEncodingZlib(cl, x, y, w, h))
+                goto updateFailed;
+            break;
+        case rfbEncodingZRLE:
+        case rfbEncodingZYWRLE:
+            if (!rfbSendRectEncodingZRLE(cl, x, y, w, h))
+            goto updateFailed;
+            break;
+    #endif
+    #if defined(LIBVNCSERVER_HAVE_LIBJPEG) && (defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG))
+        case rfbEncodingTight:
+            if (!rfbSendRectEncodingTight(cl, x, y, w, h))
+                goto updateFailed;
+            break;
+    #ifdef LIBVNCSERVER_HAVE_LIBPNG
+        case rfbEncodingTightPng:
+            if (!rfbSendRectEncodingTightPng(cl, x, y, w, h))
+                goto updateFailed;
+            break;
+    #endif
+    #endif
+            }
+        
         }
-    
-    }
-    if (i) {
-        sraRgnReleaseIterator(i);
-        i = NULL;
+        if (i) {
+            sraRgnReleaseIterator(i);
+            i = NULL;
+        }
     }
 
     if(cl->preferredEncoding == rfbEncodingH264 || cl->preferredEncoding == rfbEncodingVAH264 || cl->preferredEncoding == rfbEncodingOpenH264 )

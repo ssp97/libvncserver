@@ -707,6 +707,15 @@ typedef struct _rfbClientRec {
     int tightPngDstDataLen;
 #endif
 #endif
+#ifdef LIBVNCSERVER_HAVE_OPENH264_ENCODER
+    void* openh264Encoder;
+#endif
+#ifdef LIBVNCSERVER_HAVE_X264_ENCODER
+    void* x264Encoder;
+    void* x264Buffer;
+    size_t x264BufferSize;
+#endif
+
 } rfbClientRec, *rfbClientPtr;
 
 /**

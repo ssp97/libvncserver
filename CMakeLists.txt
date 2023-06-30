@@ -48,6 +48,8 @@ option(BUILD_SHARED_LIBS "Build shared libraries" ${UNIX})
 option(WITH_ZLIB "Search for the zlib compression library to support additional encodings" ON)
 option(WITH_LZO "Search for the LZO compression library to omit internal miniLZO implementation" ON)
 option(WITH_JPEG "Search for the libjpeg compression library to support additional encodings" ON)
+option(WITH_OPENH264_ENCODER "Search for the openh264 compression library to support additional encodings" OFF)
+option(WITH_X264_ENCODER "Search for the x264 compression library to support additional encodings" ON)
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
@@ -136,6 +138,13 @@ if(WITH_PNG)
   find_package(PNG)
 endif(WITH_PNG)
 
+if(WITH_OPENH264_ENCODER)
+  find_package(OPENH264)
+endif(WITH_OPENH264_ENCODER)
+
+if(WITH_X264_ENCODER)
+  find_package(X264)
+endif(WITH_X264_ENCODER)
 
 if(WITH_SDL)
   find_package(SDL2)
@@ -253,6 +262,18 @@ if(PNG_FOUND)
 else()
   unset(PNG_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
 endif(PNG_FOUND)
+if(OPENH264_FOUND)
+  set(LIBVNCSERVER_HAVE_OPENH264_ENCODER 1)
+else()
+  unset(OPENH264_LIBRARIES)
+endif()
+
+if(X264_FOUND)
+  set(LIBVNCSERVER_HAVE_X264_ENCODER 1)
+else()
+  unset(X264_LIBRARIES)
+endif()
+
 if(NOT OPENSSL_FOUND)
     unset(OPENSSL_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
 endif()
@@ -488,6 +509,16 @@ if(PNG_FOUND)
   include_directories(${PNG_INCLUDE_DIR})
 endif(PNG_FOUND)
 
+if(LIBVNCSERVER_HAVE_OPENH264_ENCODER)
+  add_definitions(-DLIBVNCSERVER_HAVE_OPENH264_ENCODER)
+  include_directories(${OPENH264_LIBRARIES})
+endif(LIBVNCSERVER_HAVE_OPENH264_ENCODER)
+
+if(LIBVNCSERVER_HAVE_X264_ENCODER)
+  add_definitions(-DLIBVNCSERVER_HAVE_X264_ENCODER)
+  include_directories(${X264_LIBRARIES})
+endif(LIBVNCSERVER_HAVE_X264_ENCODER)
+
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
     ${TIGHT_C}
@@ -540,6 +571,8 @@ target_link_libraries(vncserver
 		      ${CRYPTO_LIBRARIES}
                       ${GNUTLS_LIBRARIES}
                       ${OPENSSL_LIBRARIES}
+                      ${OPENH264_LIBRARIES}
+                      ${X264_LIBRARIES}
 )
 
 SET_TARGET_PROPERTIES(vncclient vncserver

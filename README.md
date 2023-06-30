@@ -58,6 +58,7 @@ RFB Protocol Support Status
 | TRLE     | 15     |              | ✔            |
 | ZRLE     | 16     | ✔            | ✔            |
 | ZYWRLE   | 17     | ✔            | ✔            |
+| OpenH264 | 50     | ✔            |              |
 | TightPNG | -260   | ✔            |              |
 
 ## Transports
