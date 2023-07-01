@@ -3275,10 +3275,18 @@ sendFramebufferUpdateAuxiliary(rfbClientPtr cl, FramebufferAuxiliaryMessages *me
     LOCK(cl->updateMutex);
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
     fu->type = rfbFramebufferUpdate;
-    cl->ublen = sz_rfbFramebufferUpdateMsg;
     fu->nRects = Swap16IfLE((uint16_t)(
                         !!messages->sendCursorShape + !!messages->sendCursorPos + !!messages->sendKeyboardLedState +
                         !!messages->sendSupportedMessages + !!messages->sendSupportedEncodings + !!messages->sendServerIdentity));
+    
+    // dont send anything if no message is needed.
+    if(fu->nRects == 0)
+    {
+        UNLOCK(cl->updateMutex);
+        return TRUE;
+    }
+    
+    cl->ublen = sz_rfbFramebufferUpdateMsg;
 
     if (messages->sendCursorShape) {
         cl->cursorWasChanged = FALSE;
