@@ -192,11 +192,13 @@ typedef struct _rfbExtensionData {
 	struct _rfbExtensionData* next;
 } rfbExtensionData;
 
+#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
 /*
  * For sunxi H264 usage
  */
 // H264 encoder callback function
 typedef rfbBool (*rfbH264EncoderCallback)(struct _rfbClientRec*, char *, size_t);
+#endif
 
 /**
  * Per-screen (framebuffer) structure.  There can be as many as you wish,
@@ -298,12 +300,14 @@ typedef struct _rfbScreenInfo
      */
     char* frameBuffer;
     
+#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
     /**
      * the H264 buffer is only for Sunxi H264 hardware encoding. 
      */
     char* h264Buffer;
     size_t h264BufferSize;
     rfbH264EncoderCallback h264EncoderCallback;
+#endif
 
     rfbKbdAddEventProcPtr kbdAddEvent;
     rfbKbdReleaseAllKeysProcPtr kbdReleaseAllKeys;
@@ -720,6 +724,11 @@ typedef struct _rfbClientRec {
     void *tightTJ;
     int tightPngDstDataLen;
 #endif
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
+    /* For sunxi h264 use */
+    rfbBool isSPS_PPS_Sent;
 #endif
 } rfbClientRec, *rfbClientPtr;
 

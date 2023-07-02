@@ -489,6 +489,10 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->extClipboardDataSize = 0;
 #endif
 
+#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
+      cl->isSPS_PPS_Sent = FALSE; /* for the frist packet we need to send cedar sps_pps header*/
+#endif
+
       sprintf(pv,rfbProtocolVersionFormat,rfbScreen->protocolMajorVersion, 
               rfbScreen->protocolMinorVersion);
 
