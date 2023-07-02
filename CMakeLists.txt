@@ -409,6 +409,7 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
     ${LIBVNCSERVER_DIR}/h264.c
+    ${LIBVNCSERVER_DIR}/venc_ve.c
     ${CRYPTO_SOURCES}
 )
 
@@ -573,6 +574,13 @@ target_link_libraries(vncserver
                       ${OPENSSL_LIBRARIES}
                       ${OPENH264_LIBRARIES}
                       ${X264_LIBRARIES}
+                      pthread 
+                      m 
+                      cdc_base 
+                      VE 
+                      vencoder 
+                      MemAdapter
+
 )
 
 SET_TARGET_PROPERTIES(vncclient vncserver

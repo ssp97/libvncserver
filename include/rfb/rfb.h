@@ -715,6 +715,7 @@ typedef struct _rfbClientRec {
     void* x264Buffer;
     size_t x264BufferSize;
 #endif
+    void* venc_ve;
 
 } rfbClientRec, *rfbClientPtr;
 
