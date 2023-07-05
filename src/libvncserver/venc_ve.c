@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define GET_MB_INFO
+
 #define loge printf("loge:");printf
 #define logd printf("logd:");printf
 #define logv printf("logv:");printf
@@ -273,8 +275,8 @@ void init_mb_info(VencMBInfo *MBInfo, encode_param_t *encode_param)
 void init_fix_qp(VencH264FixQP *fixQP)
 {
     fixQP->bEnable = 1;
-    fixQP->nIQp = 35;
-    fixQP->nPQp = 35;
+    fixQP->nIQp = 23;
+    fixQP->nPQp = 36;
 }
 
 void init_super_frame_cfg(VencSuperFrameConfig *sSuperFrameCfg)
@@ -286,7 +288,7 @@ void init_super_frame_cfg(VencSuperFrameConfig *sSuperFrameCfg)
 
 void init_svc_skip(VencH264SVCSkip *SVCSkip)
 {
-    SVCSkip->nTemporalSVC = NO_T_SVC;
+    SVCSkip->nTemporalSVC = T_LAYER_4;
     switch(SVCSkip->nTemporalSVC)
     {
         case T_LAYER_4:
@@ -326,7 +328,7 @@ void init_intra_refresh(VencCyclicIntraRefresh *sIntraRefresh)
 
 void init_roi(VencROIConfig *sRoiConfig)
 {
-    sRoiConfig[0].bEnable = 1;
+    sRoiConfig[0].bEnable = 0;
     sRoiConfig[0].index = 0;
     sRoiConfig[0].nQPoffset = 10;
     sRoiConfig[0].sRect.nLeft = 0;
@@ -334,7 +336,7 @@ void init_roi(VencROIConfig *sRoiConfig)
     sRoiConfig[0].sRect.nWidth = 1280;
     sRoiConfig[0].sRect.nHeight = 320;
 
-    sRoiConfig[1].bEnable = 1;
+    sRoiConfig[1].bEnable = 0;
     sRoiConfig[1].index = 1;
     sRoiConfig[1].nQPoffset = 10;
     sRoiConfig[1].sRect.nLeft = 320;
@@ -342,7 +344,7 @@ void init_roi(VencROIConfig *sRoiConfig)
     sRoiConfig[1].sRect.nWidth = 320;
     sRoiConfig[1].sRect.nHeight = 180;
 
-    sRoiConfig[2].bEnable = 1;
+    sRoiConfig[2].bEnable = 0;
     sRoiConfig[2].index = 2;
     sRoiConfig[2].nQPoffset = 10;
     sRoiConfig[2].sRect.nLeft = 320;
@@ -350,7 +352,7 @@ void init_roi(VencROIConfig *sRoiConfig)
     sRoiConfig[2].sRect.nWidth = 320;
     sRoiConfig[2].sRect.nHeight = 180;
 
-    sRoiConfig[3].bEnable = 1;
+    sRoiConfig[3].bEnable = 0;
     sRoiConfig[3].index = 3;
     sRoiConfig[3].nQPoffset = 10;
     sRoiConfig[3].sRect.nLeft = 320;
@@ -362,12 +364,12 @@ void init_roi(VencROIConfig *sRoiConfig)
 void init_alter_frame_rate_info(VencAlterFrameRateInfo *pAlterFrameRateInfo)
 {
     memset(pAlterFrameRateInfo, 0 , sizeof(VencAlterFrameRateInfo));
-    pAlterFrameRateInfo->bEnable = 1;
+    pAlterFrameRateInfo->bEnable = 0;
     pAlterFrameRateInfo->bUseUserSetRoiInfo = 1;
     pAlterFrameRateInfo->sRoiBgFrameRate.nSrcFrameRate = 25;
     pAlterFrameRateInfo->sRoiBgFrameRate.nDstFrameRate = 25;
 
-    pAlterFrameRateInfo->roi_param[0].bEnable = 1;
+    pAlterFrameRateInfo->roi_param[0].bEnable = 0;
     pAlterFrameRateInfo->roi_param[0].index = 0;
     pAlterFrameRateInfo->roi_param[0].nQPoffset = 10;
     pAlterFrameRateInfo->roi_param[0].roi_abs_flag = 1;
@@ -376,7 +378,7 @@ void init_alter_frame_rate_info(VencAlterFrameRateInfo *pAlterFrameRateInfo)
     pAlterFrameRateInfo->roi_param[0].sRect.nWidth = 320;
     pAlterFrameRateInfo->roi_param[0].sRect.nHeight = 320;
 
-    pAlterFrameRateInfo->roi_param[1].bEnable = 1;
+    pAlterFrameRateInfo->roi_param[1].bEnable = 0;
     pAlterFrameRateInfo->roi_param[1].index = 0;
     pAlterFrameRateInfo->roi_param[1].nQPoffset = 10;
     pAlterFrameRateInfo->roi_param[1].roi_abs_flag = 1;
@@ -760,10 +762,11 @@ int initJpegFunc(jpeg_func_t *jpeg_func, encode_param_t *encode_param)
     memset(jpeg_func, 0, sizeof(jpeg_func_t));
 
     jpeg_func->quality = 95;
-    if(encode_param->encode_frame_num > 1)
-        jpeg_func->jpeg_mode = 1;
-    else
-        jpeg_func->jpeg_mode = 0;
+    jpeg_func->jpeg_mode = 1;
+    // if(encode_param->encode_frame_num > 1)
+    //     jpeg_func->jpeg_mode = 1;
+    // else
+    //     jpeg_func->jpeg_mode = 0;
 
     if(0 == jpeg_func->jpeg_mode)
         init_jpeg_exif(&jpeg_func->exifinfo);
@@ -785,6 +788,8 @@ int initJpegFunc(jpeg_func_t *jpeg_func, encode_param_t *encode_param)
 int setEncParam(VideoEncoder *pVideoEnc ,encode_param_t *encode_param)
 {
     int result = 0;
+    unsigned char value_0 = 0;
+    unsigned char value_1 = 1;
 
     if(encode_param->encode_format == VENC_CODEC_JPEG)
     {
@@ -823,40 +828,46 @@ int setEncParam(VideoEncoder *pVideoEnc ,encode_param_t *encode_param)
         }
         unsigned int vbv_size = 12*1024*1024;
         VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264Param, &encode_param->h264_func.h264Param);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamSetVbvSize, &vbv_size);
-        //VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264FixQP, encode_param->h264_func.fixQP);
+        //VideoEncSetParameter(pVideoEnc, VENC_IndexParamSetVbvSize, &vbv_size);
+        //VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264FixQP, &encode_param->h264_func.fixQP);
 
         //VideoEncSetParameter(pVideoEnc, VENC_IndexParamSetOverlay, encode_param->h264_func.sOverlayInfo);
 
 #ifdef GET_MB_INFO
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamMBInfoOutput, encode_param->h264_func.MBInfo);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamMBInfoOutput, &encode_param->h264_func.MBInfo);
 #endif
-
-
+    VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264SVCSkip, &encode_param->h264_func.SVCSkip);
+    VideoEncSetParameter(pVideoEnc, VENC_IndexParamFastEnc, &value_1);
+    VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264VideoSignal, &encode_param->h264_func.sVideoSignal);
+    VideoEncSetParameter(pVideoEnc, VENC_IndexParamSuperFrameConfig, &encode_param->h264_func.sSuperFrameCfg);
+    VideoEncSetParameter(pVideoEnc, VENC_IndexParamIfilter, &value_0);
+    
+    //VideoEncSetParameter(pVideoEnc, VENC_IndexParamSetPSkip, &value_1);
+    
 #if 0
         unsigned char value = 1;
         //set the specify func
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264SVCSkip, &h264_func.SVCSkip);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264SVCSkip, &encode_param->h264_func.SVCSkip);
         value = 0;
         VideoEncSetParameter(pVideoEnc, VENC_IndexParamIfilter, &value);
         value = 0; //degree
         VideoEncSetParameter(pVideoEnc, VENC_IndexParamRotation, &value);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264FixQP, &h264_func.fixQP);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264FixQP, &encode_param->h264_func.fixQP);
         VideoEncSetParameter(pVideoEnc,
-            VENC_IndexParamH264CyclicIntraRefresh, &h264_func.sIntraRefresh);
+            VENC_IndexParamH264CyclicIntraRefresh, &encode_param->h264_func.sIntraRefresh);
         value = 720/4;
         VideoEncSetParameter(pVideoEnc, VENC_IndexParamSliceHeight, &value);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamROIConfig, &h264_func.sRoiConfig[0]);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamROIConfig, &h264_func.sRoiConfig[1]);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamROIConfig, &h264_func.sRoiConfig[2]);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamROIConfig, &h264_func.sRoiConfig[3]);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamROIConfig, &encode_param->h264_func.sRoiConfig[0]);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamROIConfig, &encode_param->h264_func.sRoiConfig[1]);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamROIConfig, &encode_param->h264_func.sRoiConfig[2]);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamROIConfig, &encode_param->h264_func.sRoiConfig[3]);
         value = 0;
         VideoEncSetParameter(pVideoEnc, VENC_IndexParamSetPSkip, &value);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264AspectRatio, &h264_func.sAspectRatio);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264AspectRatio, &encode_param->h264_func.sAspectRatio);
         value = 0;
         VideoEncSetParameter(pVideoEnc, VENC_IndexParamFastEnc, &value);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264VideoSignal, &h264_func.sVideoSignal);
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamSuperFrameConfig, &h264_func.sSuperFrameCfg);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamH264VideoSignal, &encode_param->h264_func.sVideoSignal);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamSuperFrameConfig, &encode_param->h264_func.sSuperFrameCfg);
 #endif
     }
     else if(encode_param->encode_format == VENC_CODEC_H265)
@@ -892,7 +903,7 @@ int setEncParam(VideoEncoder *pVideoEnc ,encode_param_t *encode_param)
         //VideoEncSetParameter(pVideoEnc, VENC_IndexParamH265HVS, &h265_func.h265Hvs);
         //VideoEncSetParameter(pVideoEnc, VENC_IndexParamH265TendRatioCoef, &h265_func.h265Trc);
 #ifdef GET_MB_INFO
-        VideoEncSetParameter(pVideoEnc, VENC_IndexParamMBInfoOutput, &h265_func.MBInfo);
+        VideoEncSetParameter(pVideoEnc, VENC_IndexParamMBInfoOutput, &encode_param->h264_func.MBInfo);
 #endif
     }
 

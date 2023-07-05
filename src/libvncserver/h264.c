@@ -1,6 +1,8 @@
 #include <rfb/rfb.h>
 #include "private.h"
 #include <stdint.h>
+#include <sys/timeb.h>
+
 
 #define H264_NO_HAVE_ENCODER        0
 #define H264_USING_EXIST_ENCODER    1
@@ -167,49 +169,56 @@ int init_venc_ve_h264(encode_param_t *encode_param, VideoEncoder** pVideoEnc)
 
 rfbBool rfbVencVeEncodec(rfbClientPtr cl, char **data, size_t *size)
 {
-    
-
     int w = cl->screen->width;
     int h = cl->screen->height;
     size_t frame_size = 0;
     int i=0;
+    struct timespec currentTime;
+    long milliseconds;
+    static long last_time;
+
+    clock_gettime(CLOCK_REALTIME, &currentTime);
+    milliseconds = currentTime.tv_sec*1000 + currentTime.tv_nsec / 1000000;
 
     if(cl->venc_ve == NULL)
     {
         printf("init.\n");
 
-        cl->venc_ve = malloc(sizeof(venc_ve));
-        ((venc_ve *)(cl->venc_ve))->sendNextOutputBuffer = 0;
-        memset(&((venc_ve *)(cl->venc_ve))->encode_param, 0, sizeof(encode_param_t));
-        ((venc_ve *)(cl->venc_ve))->encode_param.src_width = w;
-        ((venc_ve *)(cl->venc_ve))->encode_param.src_height = h;
-        ((venc_ve *)(cl->venc_ve))->encode_param.dst_width = w;
-        ((venc_ve *)(cl->venc_ve))->encode_param.dst_height = h;
-        ((venc_ve *)(cl->venc_ve))->encode_param.bit_rate = 10*1024*1024;
-        ((venc_ve *)(cl->venc_ve))->encode_param.frame_rate = 30;
-        ((venc_ve *)(cl->venc_ve))->encode_param.maxKeyFrame = 1;
-        ((venc_ve *)(cl->venc_ve))->encode_param.encode_format = VENC_CODEC_H264;
-        //((venc_ve *)(cl->venc_ve))->encode_param.encode_frame_num = 200;
-        ((venc_ve *)(cl->venc_ve))->encode_param.inputFormat = VENC_PIXEL_ABGR;//VENC_PIXEL_ARGB;
+        cl->venc_ve = malloc(sizeof(venc_ve_t));
+        memset(cl->venc_ve, 0, sizeof(venc_ve_t));
+        ((venc_ve_t *)(cl->venc_ve))->start_time = milliseconds;
+        ((venc_ve_t *)(cl->venc_ve))->sendNextOutputBuffer = 0;
+        memset(&((venc_ve_t *)(cl->venc_ve))->encode_param, 0, sizeof(encode_param_t));
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.src_width = w;
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.src_height = h;
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.dst_width = w;
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.dst_height = h;
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.bit_rate = 60*1024*1024;
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.frame_rate = 30;
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.maxKeyFrame = 1;
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.encode_format = VENC_CODEC_H264;
+        //((venc_ve_t *)(cl->venc_ve))->encode_param.encode_frame_num = 200;
+        ((venc_ve_t *)(cl->venc_ve))->encode_param.inputFormat = VENC_PIXEL_ABGR;//VENC_PIXEL_ARGB;
 
-        init_venc_ve_h264(&((venc_ve *)(cl->venc_ve))->encode_param, &((venc_ve *)(cl->venc_ve))->pVideoEnc);
-        GetOneAllocInputBuffer(((venc_ve *)(cl->venc_ve))->pVideoEnc, &((venc_ve *)(cl->venc_ve))->inputBuffer);
-        ((venc_ve *)(cl->venc_ve))->inputBuffer.bEnableCorp = 0;
-        ((venc_ve *)(cl->venc_ve))->inputBuffer.sCropInfo.nLeft =  240;
-        ((venc_ve *)(cl->venc_ve))->inputBuffer.sCropInfo.nTop  =  240;
-        ((venc_ve *)(cl->venc_ve))->inputBuffer.sCropInfo.nWidth  =  240;
-        ((venc_ve *)(cl->venc_ve))->inputBuffer.sCropInfo.nHeight =  240;
+        init_venc_ve_h264(&((venc_ve_t *)(cl->venc_ve))->encode_param, &((venc_ve_t *)(cl->venc_ve))->pVideoEnc);
+        GetOneAllocInputBuffer(((venc_ve_t *)(cl->venc_ve))->pVideoEnc, &((venc_ve_t *)(cl->venc_ve))->inputBuffer);
+        ((venc_ve_t *)(cl->venc_ve))->inputBuffer.bEnableCorp = 0;
+        // ((venc_ve_t *)(cl->venc_ve))->inputBuffer.sCropInfo.nLeft =  240;
+        // ((venc_ve_t *)(cl->venc_ve))->inputBuffer.sCropInfo.nTop  =  240;
+        // ((venc_ve_t *)(cl->venc_ve))->inputBuffer.sCropInfo.nWidth  =  240;
+        // ((venc_ve_t *)(cl->venc_ve))->inputBuffer.sCropInfo.nHeight =  240;
         
-        VideoEncGetParameter(((venc_ve *)(cl->venc_ve))->pVideoEnc, VENC_IndexParamH264SPSPPS, 
-                            &((venc_ve *)(cl->venc_ve))->sps_pps_data);
+        VideoEncGetParameter(((venc_ve_t *)(cl->venc_ve))->pVideoEnc, VENC_IndexParamH264SPSPPS, 
+                            &((venc_ve_t *)(cl->venc_ve))->sps_pps_data);
         
-        // *data = ((venc_ve *)(cl->venc_ve))->sps_pps_data.pBuffer;
-        // *size = ((venc_ve *)(cl->venc_ve))->sps_pps_data.nLength;
-        frame_size = rfbVencCopyToBuffer(&((venc_ve *)(cl->venc_ve))->buf, 
-                                        &((venc_ve *)(cl->venc_ve))->bufSize,
+        //((venc_ve_t *)(cl->venc_ve))->sps_pps_data.pBuffer[0X15] = 0X11;
+        // *data = ((venc_ve_t *)(cl->venc_ve))->sps_pps_data.pBuffer;
+        // *size = ((venc_ve_t *)(cl->venc_ve))->sps_pps_data.nLength;
+        frame_size = rfbVencCopyToBuffer(&((venc_ve_t *)(cl->venc_ve))->buf, 
+                                        &((venc_ve_t *)(cl->venc_ve))->bufSize,
                                         frame_size, 
-                                        ((venc_ve *)(cl->venc_ve))->sps_pps_data.pBuffer,
-                                        ((venc_ve *)(cl->venc_ve))->sps_pps_data.nLength
+                                        ((venc_ve_t *)(cl->venc_ve))->sps_pps_data.pBuffer,
+                                        ((venc_ve_t *)(cl->venc_ve))->sps_pps_data.nLength
          );
         
         printf("init ok.\n");
@@ -217,48 +226,67 @@ rfbBool rfbVencVeEncodec(rfbClientPtr cl, char **data, size_t *size)
     }
     //for(i=0;i<2;i++)
     {
-        FlushCacheAllocInputBuffer(((venc_ve *)(cl->venc_ve))->pVideoEnc, &((venc_ve *)(cl->venc_ve))->inputBuffer);
-        //printf("memcpy start, buf = %8x\n", (uint32_t)((venc_ve *)(cl->venc_ve))->inputBuffer.pAddrVirY);
-        memcpy(((venc_ve *)(cl->venc_ve))->inputBuffer.pAddrVirY, cl->screen->frameBuffer, w*h*4);
+        FlushCacheAllocInputBuffer(((venc_ve_t *)(cl->venc_ve))->pVideoEnc, &((venc_ve_t *)(cl->venc_ve))->inputBuffer);
+        //printf("memcpy start, buf = %8x\n", (uint32_t)((venc_ve_t *)(cl->venc_ve))->inputBuffer.pAddrVirY);
+        memcpy(((venc_ve_t *)(cl->venc_ve))->inputBuffer.pAddrVirY, cl->screen->frameBuffer, w*h*4);
         //printf("memcpy success\n");
 
-        ((venc_ve *)(cl->venc_ve))->inputBuffer.nPts += 1*1000/((venc_ve *)(cl->venc_ve))->encode_param.frame_rate;
-        AddOneInputBuffer(((venc_ve *)(cl->venc_ve))->pVideoEnc, &((venc_ve *)(cl->venc_ve))->inputBuffer);
+        ((venc_ve_t *)(cl->venc_ve))->inputBuffer.nPts = milliseconds - ((venc_ve_t *)(cl->venc_ve))->start_time;
+        //+= 1*1000/((venc_ve_t *)(cl->venc_ve))->encode_param.frame_rate; // using system ms time?
+        AddOneInputBuffer(((venc_ve_t *)(cl->venc_ve))->pVideoEnc, &((venc_ve_t *)(cl->venc_ve))->inputBuffer);
 
-        VideoEncodeOneFrame(((venc_ve *)(cl->venc_ve))->pVideoEnc);
-        AlreadyUsedInputBuffer(((venc_ve *)(cl->venc_ve))->pVideoEnc,&((venc_ve *)(cl->venc_ve))->inputBuffer);
-        ReturnOneAllocInputBuffer(((venc_ve *)(cl->venc_ve))->pVideoEnc, &((venc_ve *)(cl->venc_ve))->inputBuffer);
-        GetOneBitstreamFrame(((venc_ve *)(cl->venc_ve))->pVideoEnc, &((venc_ve *)(cl->venc_ve))->outputBuffer); //result = ?
-        FreeOneBitStreamFrame(((venc_ve *)(cl->venc_ve))->pVideoEnc, &((venc_ve *)(cl->venc_ve))->outputBuffer);
-        //*data = ((venc_ve *)(cl->venc_ve))->outputBuffer.pData0;
-        //*size = ((venc_ve *)(cl->venc_ve))->outputBuffer.nSize0;
-        frame_size = rfbVencCopyToBuffer(&((venc_ve *)(cl->venc_ve))->buf, 
-                                        &((venc_ve *)(cl->venc_ve))->bufSize,
+        VideoEncodeOneFrame(((venc_ve_t *)(cl->venc_ve))->pVideoEnc);
+        AlreadyUsedInputBuffer(((venc_ve_t *)(cl->venc_ve))->pVideoEnc,&((venc_ve_t *)(cl->venc_ve))->inputBuffer);
+        ReturnOneAllocInputBuffer(((venc_ve_t *)(cl->venc_ve))->pVideoEnc, &((venc_ve_t *)(cl->venc_ve))->inputBuffer);
+        GetOneBitstreamFrame(((venc_ve_t *)(cl->venc_ve))->pVideoEnc, &((venc_ve_t *)(cl->venc_ve))->outputBuffer); //result = ?
+        FreeOneBitStreamFrame(((venc_ve_t *)(cl->venc_ve))->pVideoEnc, &((venc_ve_t *)(cl->venc_ve))->outputBuffer);
+        //*data = ((venc_ve_t *)(cl->venc_ve))->outputBuffer.pData0;
+        //*size = ((venc_ve_t *)(cl->venc_ve))->outputBuffer.nSize0;
+        frame_size = rfbVencCopyToBuffer(&((venc_ve_t *)(cl->venc_ve))->buf, 
+                                        &((venc_ve_t *)(cl->venc_ve))->bufSize,
                                         frame_size, 
-                                        ((venc_ve *)(cl->venc_ve))->outputBuffer.pData0,
-                                        ((venc_ve *)(cl->venc_ve))->outputBuffer.nSize0
+                                        ((venc_ve_t *)(cl->venc_ve))->outputBuffer.pData0,
+                                        ((venc_ve_t *)(cl->venc_ve))->outputBuffer.nSize0
         );
-        if(((venc_ve *)(cl->venc_ve))->outputBuffer.nSize1)
+        if(((venc_ve_t *)(cl->venc_ve))->outputBuffer.nSize1)
         {
-            //((venc_ve *)(cl->venc_ve))->sendNextOutputBuffer = 1;
-            frame_size = rfbVencCopyToBuffer(&((venc_ve *)(cl->venc_ve))->buf, 
-                                        &((venc_ve *)(cl->venc_ve))->bufSize,
+            //((venc_ve_t *)(cl->venc_ve))->sendNextOutputBuffer = 1;
+            rfbLog("has buf1 .\r\n");
+            frame_size = rfbVencCopyToBuffer(&((venc_ve_t *)(cl->venc_ve))->buf, 
+                                        &((venc_ve_t *)(cl->venc_ve))->bufSize,
                                         frame_size, 
-                                        ((venc_ve *)(cl->venc_ve))->outputBuffer.pData1,
-                                        ((venc_ve *)(cl->venc_ve))->outputBuffer.nSize1
+                                        ((venc_ve_t *)(cl->venc_ve))->outputBuffer.pData1,
+                                        ((venc_ve_t *)(cl->venc_ve))->outputBuffer.nSize1
             );
         }
 
-        *data = ((venc_ve *)(cl->venc_ve))->buf;
+        *data = ((venc_ve_t *)(cl->venc_ve))->buf;
         *size = frame_size;
 
         
     }
-    rfbLog("venc_ve send %d bytes\r\n", frame_size);
+    rfbLog("venc_ve send %d bytes, delta = %dms, header = %02X %02X %02X %02X .\r\n", frame_size, milliseconds - last_time, (*data)[0], (*data)[1], (*data)[2], (*data)[3]);
+    last_time = milliseconds;
+    return TRUE;
+    // todo cl exit call FreeOneBitStreamFrame(pVideoEnc, &((venc_ve_t *)(cl->venc_ve))->outputBuffe);
+    // todo cl exit call free(cl->venc_ve);
+
+}
+
+rfbBool rfbFreeVeEncodecData(rfbClientPtr cl)
+{
+    if(cl->venc_ve)
+    {
+        releaseMb(&((venc_ve_t *)(cl->venc_ve))->encode_param);
+        ReleaseAllocInputBuffer(((venc_ve_t *)(cl->venc_ve))->pVideoEnc);
+        VideoEncUnInit(((venc_ve_t *)(cl->venc_ve))->pVideoEnc);
+        VideoEncDestroy(((venc_ve_t *)(cl->venc_ve))->pVideoEnc);
+        free(((venc_ve_t *)(cl->venc_ve))->buf);
+        free(cl->venc_ve);
+        rfbLog("free ve ok;\r\n");
+    }
 
     return TRUE;
-    // todo cl exit call FreeOneBitStreamFrame(pVideoEnc, &outputBuffer);
-
 }
 
 //end
@@ -511,7 +539,38 @@ rfbSendRectEncodingH264(rfbClientPtr cl,
     
     sendOrQueueData(cl, &h264_header, sizeof(h264_header), 0);    
     sendOrQueueData(cl, h264Data, h264Size, 1);
+
+    //debug
+    {
+        #include <stdio.h>
+
+        static FILE* pf = NULL;
+        if(pf == NULL)
+        {
+            pf = fopen("debug.h264", "wb");
+            //printf("open debug.h264 , pf = %d\r\n", pf);
+        }
+        
+        fwrite(h264Data, h264Size, 1, pf);
+
+    }
+    //end debug
     
     return TRUE;
 }
+rfbBool rfbFreeH264Data(rfbClientPtr cl)
+{
+#ifdef LIBVNCSERVER_HAVE_X264_ENCODER
+    if(cl->x264Encoder)
+    {
 
+    }
+#endif
+#ifdef LIBVNCSERVER_HAVE_OPENH264_ENCODER
+    if(cl->openh264Encoder)
+    {
+
+    }
+#endif
+    rfbFreeVeEncodecData(cl);
+}

@@ -11,48 +11,6 @@
 
 #define ALIGN_XXB(y, x) (((x) + ((y)-1)) & ~((y)-1))
 
-typedef enum {
-    INPUT,
-    HELP,
-    ENCODE_FRAME_NUM,
-    ENCODE_FORMAT,
-    OUTPUT,
-    SRC_SIZE,
-    DST_SIZE,
-    COMPARE_FILE,
-    BIT_RATE,
-    INVALID
-}ARGUMENT_T;
-
-typedef struct {
-    char Short[8];
-    char Name[128];
-    ARGUMENT_T argument;
-    char Description[512];
-}argument_t;
-
-static const argument_t ArgumentMapping[] =
-{
-    { "-h",  "--help",    HELP,
-        "Print this help" },
-    { "-i",  "--input",   INPUT,
-        "Input file path" },
-    { "-n",  "--encode_frame_num",   ENCODE_FRAME_NUM,
-        "After encoder n frames, encoder stop" },
-    { "-f",  "--encode_format",  ENCODE_FORMAT,
-        "0:h264 encoder, 1:jpeg_encoder, 3:h265 encoder" },
-    { "-o",  "--output",  OUTPUT,
-        "output file path" },
-    { "-s",  "--srcsize",  SRC_SIZE,
-        "src_size,can be 2160,1080,720,480,288" },
-    { "-d",  "--dstsize",  DST_SIZE,
-        "dst_size,can be 2160,1080,720,480,288" },
-    { "-c",  "--compare",  COMPARE_FILE,
-        "compare file:reference file path" },
-    { "-b",  "--bitrate",  BIT_RATE,
-        "bitRate:kbps" },
-};
-
 typedef struct {
     unsigned int width;
     unsigned int height;
@@ -119,7 +77,6 @@ typedef struct {
     int              compare_flag;
     int              compare_result;
 
-    unsigned int  encode_frame_num;
     unsigned int  encode_format;
 
     unsigned int src_size;
@@ -145,9 +102,10 @@ typedef struct {
     uint8_t sendNextOutputBuffer;
     size_t bufSize;
     void *buf;
+    uint64_t     start_time;
     encode_param_t encode_param;
     VideoEncoder* pVideoEnc;
     VencHeaderData sps_pps_data;
     VencInputBuffer inputBuffer;
     VencOutputBuffer outputBuffer;
-}venc_ve;
+}venc_ve_t;

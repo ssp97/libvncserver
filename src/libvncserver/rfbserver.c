@@ -594,6 +594,8 @@ rfbClientConnectionGone(rfbClientPtr cl)
 #endif
 #endif
 
+    rfbFreeH264Data(cl);
+
     rfbFreeUltraData(cl);
 
     /* free buffers holding pixel data before and after encoding */
