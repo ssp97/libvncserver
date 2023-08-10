@@ -45,6 +45,7 @@ option(WITH_LZO "Search for the LZO compression library to omit internal miniLZO
 option(WITH_JPEG "Search for the libjpeg compression library to support additional encodings" ON)
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SUNXI_H264 "Search for the sunxi cedar userland driver to support hardware h264 encodings" ON)
+option(WITH_SUNXI_JPEG "Search for the sunxi cedar userland driver to support hardware jpeg encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
 option(WITH_LIBSSH2 "Search for libssh2 to build an example ssh-tunneled client" ON)
@@ -68,6 +69,14 @@ if(WITH_SUNXI_H264)
   # Fix that later.
   message(STATUS "Sunxi CedarX H264 hardware encoder support is enabled")
   set(LIBVNCSERVER_HAVE_SUNXI_H264 1)
+endif()
+
+if(WITH_SUNXI_JPEG)
+  # Maybe we should use find_package here, but I don't know how to do that now.
+  # Fix that later.
+  message(STATUS "Sunxi CedarX mjpeg hardware encoder support is enabled")
+  set(LIBVNCSERVER_HAVE_SUNXI_JPEG 1)
+  unset(WITH_JPEG)
 endif()
 
 if(WITH_ZLIB)
@@ -559,6 +568,7 @@ set(LIBVNCSERVER_EXAMPLES
     storepasswd
     vncev
     h264test
+    jpegtest
   )
 
 if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))

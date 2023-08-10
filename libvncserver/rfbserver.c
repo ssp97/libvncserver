@@ -1051,6 +1051,9 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
     rfbEncodingVAH264,
     rfbEncodingOpenH264,
 #endif
+#ifdef LIBVNCSERVER_HAVE_SUNXI_JPEG
+    rfbEncodingJPEG,
+#endif
 	rfbEncodingUltra,
 	rfbEncodingUltraZip,
 	rfbEncodingXCursor,
@@ -2369,6 +2372,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         case rfbEncodingVAH264:
         case rfbEncodingOpenH264:
 #endif
+#ifdef LIBVNCSERVER_HAVE_SUNXI_JPEG
+        case rfbEncodingJPEG:
+#endif
             /* The first supported encoding is the 'preferred' encoding */
                 if (cl->preferredEncoding == -1)
                     cl->preferredEncoding = enc;
@@ -3104,26 +3110,26 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     }
 }
 
-#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
+#if (defined LIBVNCSERVER_HAVE_SUNXI_H264) || (defined LIBVNCSERVER_HAVE_SUNXI_JPEG)
 /*
  * sendOrQueueData - send data to the client if the send buffer is full,
  * otherwise queue it.
  * Returns TRUE on success, FALSE on failure.
  * 
- * This is for H264 use to build the framebuffer update message packet.
+ * This is for H264 and JPEG use to build the framebuffer update message packet.
  */
 
 rfbBool sendOrQueueData(rfbClientPtr cl, unsigned char * data, int size, int forceFlush) {
     rfbBool result = TRUE;
     if (size > UPDATE_BUF_SIZE) {
-        rfbErr("x264: send request size (%d) exhausts UPDATE_BUF_SIZE (%d) -> increase send buffer\n", size, UPDATE_BUF_SIZE);
+        rfbErr("x264/jpeg: send request size (%d) exhausts UPDATE_BUF_SIZE (%d) -> increase send buffer\n", size, UPDATE_BUF_SIZE);
         result = FALSE;
         goto error;
     }
 
     if(cl->ublen + size > UPDATE_BUF_SIZE) {
         if(!rfbSendUpdateBuf(cl)) {
-            rfbErr("x264: could not send.\n");
+            rfbErr("x264/jpeg: could not send.\n");
             result = FALSE;
         }
     }
@@ -3132,9 +3138,9 @@ rfbBool sendOrQueueData(rfbClientPtr cl, unsigned char * data, int size, int for
     cl->ublen += size;
 
     if(forceFlush) {
-        rfbLog("flush x264 data %d (payloadSize=%d)\n",cl->ublen,cl->ublen - sz_rfbFramebufferUpdateMsg - sz_rfbFramebufferUpdateRectHeader);
+        rfbLog("flush x264/jpeg data %d (payloadSize=%d)\n",cl->ublen,cl->ublen - sz_rfbFramebufferUpdateMsg - sz_rfbFramebufferUpdateRectHeader);
         if(!rfbSendUpdateBuf(cl)) {
-            rfbErr("x264: could not send.\n");
+            rfbErr("x264/jpeg: could not send.\n");
             result = FALSE;
         }
     }
@@ -3144,11 +3150,11 @@ rfbBool sendOrQueueData(rfbClientPtr cl, unsigned char * data, int size, int for
 }
 
 /*
- * sendFramebufferUpdateMsg264 - send a framebuffer h264 update message to the
+ * sendFramebufferUpdateMsg - send a framebuffer update message to the
  * RFB client.
  */
 
-rfbBool sendFramebufferUpdateMsg264(rfbClientPtr cl, int x, int y, int w, int h, unsigned char * data, size_t size, int forceFlush) {
+rfbBool sendFramebufferUpdateMsg(rfbClientPtr cl, int x, int y, int w, int h, unsigned char * data, size_t size, int forceFlush) {
     rfbBool result = TRUE;
     rfbFramebufferUpdateMsg msg;
     rfbFramebufferUpdateRectHeader header;
@@ -3166,9 +3172,9 @@ rfbBool sendFramebufferUpdateMsg264(rfbClientPtr cl, int x, int y, int w, int h,
     header.r.y = Swap16IfLE(y);
     header.r.w = Swap16IfLE(w);
     header.r.h = Swap16IfLE(h);
-    header.encoding = Swap32IfLE(rfbEncodingOpenH264);
+    header.encoding = Swap32IfLE(cl->preferredEncoding);
 
-    rfbStatRecordEncodingSent(cl, rfbEncodingOpenH264,
+    rfbStatRecordEncodingSent(cl, cl->preferredEncoding,
                               sz_rfbFramebufferUpdateRectHeader + size,
                               sz_rfbFramebufferUpdateRectHeader
                               + w * (cl->format.bitsPerPixel / 8) * h);
@@ -3329,7 +3335,9 @@ updateFailed:
     UNLOCK(cl->updateMutex);
     return FALSE;
 }
+#endif
 
+#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
 /*
  * rfbSendFramebufferUpdateSunxiH264
  * Pack and send the currently framebuffer to the RFB client.
@@ -3373,7 +3381,7 @@ rfbBool rfbSendFramebufferUpdateSunxiH264(rfbClientPtr cl) {
 
     memcpy(h264packedbuffer + 8, h264buffer, h264buffersize);
 
-    result = sendFramebufferUpdateMsg264(cl, 0, 0, screenwidth, screenheight, h264packedbuffer, h264packedbuffersize, 1);
+    result = sendFramebufferUpdateMsg(cl, 0, 0, screenwidth, screenheight, h264packedbuffer, h264packedbuffersize, 1);
 
     free(h264packedbuffer);
     return result;
@@ -3399,6 +3407,85 @@ rfbBool sendFramebufferUpdateH264(rfbClientPtr cl, sraRegionPtr givenUpdateRegio
     }
 
     if(!rfbSendFramebufferUpdateSunxiH264(cl)) {
+        result = FALSE;
+        goto updateFailed;
+    }
+
+    if(!sendFramebufferUpdateAuxiliary(cl, &messages)) {
+        result = FALSE;
+        goto updateFailed;
+    }
+
+updateFailed:
+    if(cl->screen->displayFinishedHook)
+        cl->screen->displayFinishedHook(cl, result);
+    
+    return result;
+}
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_SUNXI_JPEG
+/*
+ * rfbSendFramebufferUpdateSunxiJpeg
+ * Pack and send the currently framebuffer to the RFB client.
+ */
+rfbBool rfbSendFramebufferUpdateSunxiJpeg(rfbClientPtr cl) {
+    int screenwidth = cl->screen->width;
+    int screenheight = cl->screen->height;
+    char *jpegbuffer;
+    size_t jpegbuffersize;
+    rfbBool result = FALSE;
+
+    //char *jpegpackedbuffer = NULL;
+    //size_t jpegpackedbuffersize = 0;
+
+    // TODO: demo mode, just send the already encoded data.
+    // TODO: change to sunxi jpeg encoding.
+
+    if(cl->screen->jpegEncoderCallback)
+    {
+        result = cl->screen->jpegEncoderCallback(cl, cl->screen->jpegBuffer, cl->screen->jpegBufferSize);
+        if(!result)
+            return FALSE;
+    }
+    
+    jpegbuffer = cl->screen->jpegBuffer;
+    jpegbuffersize = cl->screen->jpegBufferSize;
+
+    //jpegpackedbuffersize = jpegbuffersize + 8;
+    //jpegpackedbuffer = malloc(jpegpackedbuffersize);
+    //if (jpegpackedbuffer == NULL) {
+    //   rfbErr("jpeg: could not allocate memory for packed buffer.\n");
+    //   return FALSE;
+    //}
+
+    //memcpy(h264packedbuffer, jpegbuffer, jpegbuffersize);
+
+    result = sendFramebufferUpdateMsg(cl, 0, 0, screenwidth, screenheight, jpegbuffer, jpegbuffersize, 1);
+
+    //free(h264packedbuffer);
+    return result;
+}
+/*
+ * sendFramebufferUpdateJpeg - send the currently framebuffer to the RFB client.
+ * Using JPEG encoding, so we just want to send the whole framebuffer.
+ * Auxiliary messages function are just copied from original function.
+ */
+rfbBool sendFramebufferUpdateJpeg(rfbClientPtr cl, sraRegionPtr givenUpdateRegion) {
+    FramebufferAuxiliaryMessages messages;
+    rfbBool result = TRUE;
+
+    if(cl->screen->displayHook)
+        cl->screen->displayHook(cl);
+
+    //TODO: resize support.
+
+    if(!getFramebufferUpdateAuxiliary(cl, &messages)) {
+        result = FALSE;
+        goto updateFailed;
+    }
+
+    if(!rfbSendFramebufferUpdateSunxiJpeg(cl)) {
         result = FALSE;
         goto updateFailed;
     }
@@ -3446,6 +3533,17 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     // We just hook this function to a new one.
     if(cl->preferredEncoding == rfbEncodingOpenH264 || cl->preferredEncoding == rfbEncodingVAH264) {
         if(!sendFramebufferUpdateH264(cl, givenUpdateRegion)) {
+            return FALSE;
+        }
+        return TRUE;
+    }
+#endif
+#ifdef LIBVNCSERVER_HAVE_SUNXI_JPEG
+    // For JPEG encoding, there are no way to send partial update.
+    // So we send the whole framebuffer, then this function mostly code will become useless.
+    // We just hook this function to a new one.
+    if(cl->preferredEncoding == rfbEncodingJPEG) {
+        if(!sendFramebufferUpdateJpeg(cl, givenUpdateRegion)) {
             return FALSE;
         }
         return TRUE;

@@ -5,11 +5,11 @@
 #include "rfb/keysym.h"
 #include "rfb/rfbregion.h"
 
-#ifdef LIBVNCSERVER_HAVE_SUNXI_H264
+#if LIBVNCSERVER_HAVE_SUNXI_JPEG
 
 static int counter = 0;
-static int width = 512;
-static int height = 512;
+static int width = 1920;
+static int height = 1080;
 
 static void SetXCursor2(rfbScreenInfoPtr rfbScreen)
 {
@@ -101,44 +101,44 @@ static void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
 	c->cleanupMask=TRUE;
 }
 
-rfbBool _rfbH264EncoderCallback(rfbClientPtr cl, char *buffer, size_t size)
+rfbBool _rfbJpegEncoderCallback(rfbClientPtr cl, char *buffer, size_t size)
 {
-    static int nal_number = 0; // 0000 - 0091
-    char *nal_filename_fmt = "/mnt/disk1/libvncserver-h264-test/nal_split/h264-splitter/test.h264.%04d";
-    char nal_filename[256];
-    char *nal_buffer = buffer;
-    size_t nal_buffer_size = 0;
+    static int jpeg_number = 1; // 0001 - 4544
+    char *jpeg_filename_fmt = "/jpeg-splitter/test.%04d.jpg";
+    char jpeg_filename[256];
+    char *jpeg_buffer = buffer;
+    size_t jpeg_buffer_size = 0;
 
-    printf("rfbEncodingOpenH264 Sending NAL %d\n", nal_number);
-    sprintf(nal_filename, nal_filename_fmt, nal_number);
-    FILE *nal_file = fopen(nal_filename, "rb");
-    if (nal_file == NULL) {
-        printf("Error opening file %s\n", nal_filename);
+    printf("rfbEncodingJpeg Sending file %d\n", jpeg_number);
+    sprintf(jpeg_filename, jpeg_filename_fmt, jpeg_number);
+    FILE *jpeg_file = fopen(jpeg_filename, "rb");
+    if (jpeg_file == NULL) {
+        printf("Error opening file %s\n", jpeg_filename);
         return FALSE;
     }
-    fseek(nal_file, 0, SEEK_END);
-    nal_buffer_size = ftell(nal_file);
-    fseek(nal_file, 0, SEEK_SET);
+    fseek(jpeg_file, 0, SEEK_END);
+    jpeg_buffer_size = ftell(jpeg_file);
+    fseek(jpeg_file, 0, SEEK_SET);
 
     // buffer format: uint32 length of data, uint32 flags, uint8 data[length]
-    nal_buffer_size = nal_buffer_size;
-    if(nal_buffer != NULL) {
-        free(nal_buffer);
+    jpeg_buffer_size = jpeg_buffer_size;
+    if(jpeg_buffer != NULL) {
+        free(jpeg_buffer);
     }
-    nal_buffer = malloc(nal_buffer_size);
-    if(nal_buffer == NULL) {
-        printf("Error allocating memory for file %s\n", nal_filename);
+    jpeg_buffer = malloc(jpeg_buffer_size);
+    if(jpeg_buffer == NULL) {
+        printf("Error allocating memory for file %s\n", jpeg_filename);
         return FALSE;
     }
-    fread(nal_buffer, 1, nal_buffer_size, nal_file);
-    fclose(nal_file);
+    fread(jpeg_buffer, 1, jpeg_buffer_size, jpeg_file);
+    fclose(jpeg_file);
 
-    cl->screen->h264Buffer = nal_buffer;
-    cl->screen->h264BufferSize = nal_buffer_size;
+    cl->screen->jpegBuffer = jpeg_buffer;
+    cl->screen->jpegBufferSize = jpeg_buffer_size;
 
-    nal_number++;
-    if (nal_number > 91) {
-        nal_number = 0;
+    jpeg_number++;
+    if (jpeg_number > 4544) {
+        jpeg_number = 1;
     }
 
     return TRUE;
@@ -152,10 +152,10 @@ int main(int argc,char** argv)
     SetXCursor2(rfbScreen);
     SetAlphaCursor(rfbScreen, 0);
     rfbInitServer(rfbScreen);
-    rfbScreen->desktopName = "H264 Test";
-    rfbScreen->h264EncoderCallback = _rfbH264EncoderCallback;
-    rfbScreen->h264Buffer = NULL;
-    rfbScreen->h264BufferSize = 0;
+    rfbScreen->desktopName = "JPEG Test";
+    rfbScreen->jpegEncoderCallback = _rfbJpegEncoderCallback;
+    rfbScreen->jpegBuffer = NULL;
+    rfbScreen->jpegBufferSize = 0;
 
     int i;
     for(i=0; rfbIsActive(rfbScreen); i++)
@@ -170,7 +170,7 @@ int main(int argc,char** argv)
 int main(int argc,char** argv)
 {
     rfbLogEnable(1);
-	rfbLog("not support h264 encoder.");
+	rfbLog("not support jpeg encoder.");
     return(0);
 }
 #endif

@@ -199,6 +199,13 @@ typedef struct _rfbExtensionData {
 // H264 encoder callback function
 typedef rfbBool (*rfbH264EncoderCallback)(struct _rfbClientRec*, char *, size_t);
 #endif
+#ifdef LIBVNCSERVER_HAVE_SUNXI_JPEG
+/*
+ * For sunxi JPEG usage
+ */
+// H264 encoder callback function
+typedef rfbBool (*rfbJpegEncoderCallback)(struct _rfbClientRec*, char *, size_t);
+#endif
 
 /**
  * Per-screen (framebuffer) structure.  There can be as many as you wish,
@@ -307,6 +314,11 @@ typedef struct _rfbScreenInfo
     char* h264Buffer;
     size_t h264BufferSize;
     rfbH264EncoderCallback h264EncoderCallback;
+#endif
+#ifdef LIBVNCSERVER_HAVE_SUNXI_JPEG
+    char* jpegBuffer;
+    size_t jpegBufferSize;
+    rfbJpegEncoderCallback jpegEncoderCallback;
 #endif
 
     rfbKbdAddEventProcPtr kbdAddEvent;
